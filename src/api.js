@@ -31,6 +31,12 @@ export const api = {
     updateMe: body => request('/users/me', { method: 'PUT', body: JSON.stringify(body) }),
     changePassword: body => request('/users/change-password', { method: 'POST', body: JSON.stringify(body) })
   },
+  subscriptions: {
+    plans: () => request('/subscriptions/plans'),
+    me: () => request('/subscriptions/me'),
+    createOrder: planId => request('/subscriptions/create-order', { method: 'POST', body: JSON.stringify({ planId }) }),
+    verify: body => request('/subscriptions/verify', { method: 'POST', body: JSON.stringify(body) })
+  },
   admin: {
     stats: () => request('/admin/stats'),
     categories: () => request('/admin/categories'),
