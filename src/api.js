@@ -71,7 +71,14 @@ export const api = {
     questions: id => request(`/admin/tests/${id}/questions`),
     createQuestion: (id, body) => request(`/admin/tests/${id}/questions`, { method: 'POST', body: JSON.stringify(body) }),
     updateQuestion: (id, body) => request(`/admin/questions/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-    deleteQuestion: id => request(`/admin/questions/${id}`, { method: 'DELETE' })
+    deleteQuestion: id => request(`/admin/questions/${id}`, { method: 'DELETE' }),
+    subscriptionStats: () => request('/admin/subscriptions/stats'),
+    subscriptions: (search = '', status = 'All') => request(`/admin/subscriptions?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`),
+    payments: (search = '', status = 'All') => request(`/admin/subscriptions/payments?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`),
+    plans: () => request('/admin/subscriptions/plans'),
+    updatePlan: (id, body) => request(`/admin/subscriptions/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+    manualActivate: body => request('/admin/subscriptions/manual-activate', { method: 'POST', body: JSON.stringify(body) }),
+    cancelSubscription: id => request(`/admin/subscriptions/${id}/cancel`, { method: 'POST' })
   }
 };
 
