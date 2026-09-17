@@ -14,6 +14,7 @@ export default defineConfig({
         auth: resolve(rootDir, 'auth.html'),
         admin: resolve(rootDir, 'admin.html'),
         adminSubscriptions: resolve(rootDir, 'admin-subscriptions.html'),
+        adminAudit: resolve(rootDir, 'admin-audit.html'),
         student: resolve(rootDir, 'student.html'),
         premium: resolve(rootDir, 'premium.html')
       }
