@@ -56,6 +56,8 @@ export const api = {
   subscriptions: {
     plans: () => request('/subscriptions/plans'),
     me: () => request('/subscriptions/me'),
+    history: () => request('/subscriptions/history'),
+    payments: () => request('/subscriptions/payments'),
     createOrder: planId => request('/subscriptions/create-order', { method: 'POST', body: JSON.stringify({ planId }) }),
     verify: body => request('/subscriptions/verify', { method: 'POST', body: JSON.stringify(body) })
   },
