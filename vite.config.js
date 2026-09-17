@@ -13,7 +13,8 @@ export default defineConfig({
         main: resolve(rootDir, 'index.html'),
         auth: resolve(rootDir, 'auth.html'),
         admin: resolve(rootDir, 'admin.html'),
-        student: resolve(rootDir, 'student.html')
+        student: resolve(rootDir, 'student.html'),
+        premium: resolve(rootDir, 'premium.html')
       }
     }
   }
