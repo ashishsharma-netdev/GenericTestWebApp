@@ -17,26 +17,54 @@ function App() {
   const [page, setPage] = useState(requestedTestId > 0 ? 'instructions' : 'home'); const [exam, setExam] = useState(requestedExam || 'SSC'); const [categories, setCategories] = useState(fallbackExams); const [tests, setTests] = useState([]);
   const [selectedTest, setSelectedTest] = useState(null); const [questions, setQuestions] = useState([]); const [answers, setAnswers] = useState({}); const [marked, setMarked] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0); const [secondsLeft, setSecondsLeft] = useState(0); const [testStartedAt, setTestStartedAt] = useState(null); const [attemptId, setAttemptId] = useState(null);
-  const [submitted, setSubmitted] = useState(false); const [result, setResult] = useState(null); const [loading, setLoading] = useState(false); const [apiError, setApiError] = useState('');
+  const [submitted, setSubmitted] = useState(false); const [result, setResult] = useState(null); const [loading, setLoading] = useState(false); const [apiError, setApiError] = useState(''); const [resumeNotice, setResumeNotice] = useState('');
 
   useEffect(() => { api.categories().then(setCategories).catch(() => setApiError('Unable to load exam categories from the API.')); }, []);
   useEffect(() => { if (page !== 'tests') return; setLoading(true); api.tests(exam).then(setTests).catch(() => setTests([])).finally(() => setLoading(false)); }, [page, exam]);
   useEffect(() => { if (page !== 'test' || !testStartedAt) return; const timer = window.setInterval(() => setSecondsLeft(s => Math.max(0, s - 1)), 1000); return () => window.clearInterval(timer); }, [page, testStartedAt]);
-  useEffect(() => { if (page === 'test' && testStartedAt && secondsLeft === 0 && !submitted) { confirmSubmit(true); } }, [secondsLeft]);
+  useEffect(() => { if (page === 'test' && testStartedAt && secondsLeft === 0 && !submitted) confirmSubmit(true); }, [secondsLeft]);
 
   const nav = (nextPage) => { setPage(nextPage); if (nextPage !== 'test') setSubmitted(false); setApiError(''); };
   const chooseExam = (name) => { setExam(name); nav('tests'); };
 
   const startInstructions = async (test) => {
-    setLoading(true); setApiError(''); setSelectedTest(test);
+    setLoading(true); setApiError(''); setResumeNotice(''); setSelectedTest(test);
     try { const [detail, qs] = await Promise.all([api.test(test.id), api.questions(test.id)]); setSelectedTest(detail); setQuestions(qs || []); nav('instructions'); }
     catch (e) { setApiError(e.message || 'Unable to load this test.'); }
     finally { setLoading(false); }
   };
 
+  const resumeAttempt = async (active) => {
+    try {
+      const qs = await api.questions(active.testId);
+      if (!qs?.length) { setApiError('The active test has no questions available.'); return; }
+      const nextAnswers = {}; const nextMarked = {};
+      (active.answers || []).forEach(a => { if (a.answer) nextAnswers[a.questionId] = a.answer; if (a.markedForReview) nextMarked[a.questionId] = true; });
+      setSelectedTest(active.test); setQuestions(qs); setAttemptId(active.attemptId); setSecondsLeft(active.remainingSeconds); setTestStartedAt(Date.now()); setAnswers(nextAnswers); setMarked(nextMarked); setCurrentIndex(0); setResult(null); setResumeNotice('Your unfinished test has been restored.'); setPage('test');
+    } catch (e) { setApiError(e.message || 'Unable to restore the unfinished test.'); }
+  };
+
   useEffect(() => {
-    if (!requestedTestId) return;
-    startInstructions({ id: requestedTestId, title: 'Loading test...', questions: 0, marks: 0, durationMinutes: 0, negativeMarking: 0 });
+    let cancelled = false;
+    const recover = async () => {
+      if (!localStorage.getItem('testprep_access_token')) return;
+      try {
+        const active = await api.attempts.active();
+        if (!cancelled && active && active.testId) {
+          if (requestedTestId && requestedTestId !== active.testId) {
+            setResumeNotice('You have an unfinished test. Open it from the test link to continue.');
+          } else {
+            await resumeAttempt(active);
+          }
+        } else if (!cancelled && requestedTestId) {
+          await startInstructions({ id: requestedTestId, title: 'Loading test...', questions: 0, marks: 0, durationMinutes: 0, negativeMarking: 0 });
+        }
+      } catch {
+        if (!cancelled && requestedTestId) await startInstructions({ id: requestedTestId, title: 'Loading test...', questions: 0, marks: 0, durationMinutes: 0, negativeMarking: 0 });
+      }
+    };
+    recover();
+    return () => { cancelled = true; };
   }, []);
 
   const startTest = async () => {
@@ -44,7 +72,7 @@ function App() {
     setLoading(true); setApiError('');
     try {
       const attempt = await api.attempts.start(selectedTest.id);
-      setAttemptId(attempt.attemptId); setSecondsLeft(attempt.remainingSeconds); setTestStartedAt(Date.now()); setAnswers({}); setMarked({}); setCurrentIndex(0); setResult(null); nav('test');
+      setAttemptId(attempt.attemptId); setSecondsLeft(attempt.remainingSeconds); setTestStartedAt(Date.now()); setAnswers({}); setMarked({}); setCurrentIndex(0); setResult(null); setResumeNotice(attempt.resumed ? 'Your previous attempt has been resumed.' : ''); nav('test');
       const saved = await api.attempts.get(attempt.attemptId);
       const nextAnswers = {}; const nextMarked = {};
       (saved.answers || []).forEach(a => { if (a.answer) nextAnswers[a.questionId] = a.answer; if (a.markedForReview) nextMarked[a.questionId] = true; });
@@ -58,7 +86,6 @@ function App() {
     try { await api.attempts.saveAnswer(attemptId, { questionId: Number(questionId), answer: answer || null, markedForReview: !!isMarked }); }
     catch (e) { if (e.status === 409 && e.message.includes('expired')) { await confirmSubmit(true); } else setApiError('Answer could not be saved. Please check your connection.'); }
   };
-
   const setAnswerForQuestion = (questionId, value) => { setAnswers(prev => ({ ...prev, [questionId]: value })); saveAnswer(questionId, value, !!marked[questionId]); };
   const toggleMarkForQuestion = (questionId) => { const next = !marked[questionId]; setMarked(prev => ({ ...prev, [questionId]: next })); saveAnswer(questionId, answers[questionId] || null, next); };
   const clearAnswerForQuestion = (questionId) => { setAnswers(prev => { const next = { ...prev }; delete next[questionId]; return next; }); saveAnswer(questionId, null, !!marked[questionId]); };
@@ -67,12 +94,12 @@ function App() {
     if (!attemptId || !selectedTest || submitted) return;
     setSubmitted(true); setLoading(true); setApiError('');
     const payload = questions.map(q => ({ questionId: Number(q.id), answer: answers[q.id] || null, markedForReview: !!marked[q.id] }));
-    try { const response = await api.attempts.submit(attemptId, payload); setResult(response); setTestStartedAt(null); setSecondsLeft(0); nav('result'); }
+    try { const response = await api.attempts.submit(attemptId, payload); setResult(response); setTestStartedAt(null); setSecondsLeft(0); setResumeNotice(''); nav('result'); }
     catch (e) { setSubmitted(false); setApiError(e.message || (auto ? 'The test could not be auto-submitted.' : 'Unable to submit the test.')); }
     finally { setLoading(false); }
   }
 
-  return <div className="app"><Header nav={nav} page={page}/>{apiError && <div className="api-banner"><AlertCircle size={14}/>{apiError}<button onClick={() => setApiError('')}>×</button></div>}
+  return <div className="app"><Header nav={nav} page={page}/>{apiError && <div className="api-banner"><AlertCircle size={14}/>{apiError}<button onClick={() => setApiError('')}>×</button></div>}{resumeNotice && page === 'test' && <div className="api-banner"><RefreshCw size={14}/>{resumeNotice}<button onClick={() => setResumeNotice('')}>×</button></div>}
     {page === 'home' && <Home exams={categories} onStart={() => chooseExam('SSC')}/>} {page !== 'home' && <div className="shell"><Sidebar page={page} nav={nav}/><main className="content">
       {page === 'dashboard' && <Dashboard/>}{page === 'categories' && <Categories exams={categories} onSelect={chooseExam}/>} {page === 'tests' && <Tests exam={exam} tests={tests} loading={loading} onStart={startInstructions}/>}
       {page === 'instructions' && <Instructions test={selectedTest} loading={loading} onBack={() => nav('tests')} onStart={startTest}/>} 
@@ -85,12 +112,10 @@ function App() {
 }
 
 function Header({ nav, page }) {
-  const openAuth = (mode = 'login') => {
-    const target = `/auth.html?mode=${mode}&returnUrl=${encodeURIComponent('/student.html')}`;
-    window.location.href = target;
-  };
+  const openAuth = (mode = 'login') => { window.location.href = `/auth.html?mode=${mode}&returnUrl=${encodeURIComponent('/student.html')}`; };
   const authButtonStyle = { height: '34px', borderRadius: '8px', padding: '0 15px', fontSize: '10px', fontWeight: 700, cursor: 'pointer' };
-  return <header className="top"><button className="brand" onClick={() => nav('home')}><div className="logo">✦</div><span>TestPrep</span></button><nav><button onClick={() => nav('categories')}>Exams</button><button>Features</button><button>Pricing</button><button>Blogs</button><button>About</button></nav><div className="top-actions"><div className="search"><Search size={15}/><input placeholder="Search tests, exams..."/></div><Bell size={18}/>{page === 'home' && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><button style={{ ...authButtonStyle, background: '#fff', color: '#1269df', border: '1px solid #1269df' }} onClick={() => openAuth('login')}>Log In</button><button style={{ ...authButtonStyle, background: '#1269df', color: '#fff', border: '1px solid #1269df' }} onClick={() => openAuth('register')}>Sign Up</button></div>}<div className="avatar">N</div><span className="name">Student⌄</span></div></header>; }
+  return <header className="top"><button className="brand" onClick={() => nav('home')}><div className="logo">✦</div><span>TestPrep</span></button><nav><button onClick={() => nav('categories')}>Exams</button><button>Features</button><button>Pricing</button><button>Blogs</button><button>About</button></nav><div className="top-actions"><div className="search"><Search size={15}/><input placeholder="Search tests, exams..."/></div><Bell size={18}/>{page === 'home' && <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><button style={{ ...authButtonStyle, background: '#fff', color: '#1269df', border: '1px solid #1269df' }} onClick={() => openAuth('login')}>Log In</button><button style={{ ...authButtonStyle, background: '#1269df', color: '#fff', border: '1px solid #1269df' }} onClick={() => openAuth('register')}>Sign Up</button></div>}<div className="avatar">N</div><span className="name">Student⌄</span></div></header>;
+}
 function Sidebar({ page, nav }) { const items=[['dashboard','Dashboard',LayoutDashboard],['tests','My Tests',ClipboardList],['categories','Exam Categories',Grid2X2],['performance','Performance',BarChart3],['bookmarks','Bookmarks',Bookmark],['current','Current Affairs',Newspaper],['study','Study Material',BookOpen],['mock','Mock Interviews',Mic],['refer','Refer & Earn',FileText],['settings','Settings',ShieldCheck]]; return <aside className="sidebar"><div className="side-title"><div className="logo small">✦</div><b>TestPrep</b></div>{items.map(([id,label,Icon])=><button key={id} className={page===id?'active':''} onClick={()=>nav(id)}><Icon size={16}/>{label}{['tests','categories'].includes(id)&&<ChevronRight className="chev" size={14}/>}</button>)}</aside>; }
 function Home({ exams, onStart }) { return <div><section className="hero"><div><div className="pill">India’s trusted mock test platform</div><h1>Prepare Today<br/><span>For a Brighter Tomorrow</span></h1><p>Unlimited mock tests, practice sets, previous year papers and performance analytics.</p><div className="exam-row">{exams.map(e=><button onClick={()=>onStart(e.name)} key={e.name}><span>{e.icon}</span>{e.name}</button>)}</div><div className="cta"><button className="primary" onClick={onStart}>Start Free Test</button><button className="secondary"><PlayCircle size={17}/> Watch Video</button></div></div><div className="hero-card"><div className="scribble">Practice<br/>Analyze<br/>Improve<br/>Succeed.</div><div className="person">👩🏻‍💻</div><div className="support">🎓 <b>Your Dream<br/>Our Support</b></div></div></section><section className="features"><Feature t="Latest Exam Pattern" i="▣"/><Feature t="Real Exam Interface" i="✓"/><Feature t="Detailed Analysis" i="↗"/><Feature t="Bilingual Content" i="文"/><Feature t="Affordable Plans" i="♢"/></section><section className="popular"><h2>Popular Exams</h2><div className="exam-grid">{exams.map(e=><button onClick={()=>onStart(e.name)} key={e.name}><strong>{e.icon} {e.name}</strong><small>{e.description}</small></button>)}</div></section></div>; }
 const Feature=({t,i})=><div><span className="ficon">{i}</span><b>{t}</b></div>;
