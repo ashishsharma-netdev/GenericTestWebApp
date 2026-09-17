@@ -17,42 +17,33 @@ async function request(path, options = {}, retry = true) {
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) };
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
-
   if (response.ok) return response.status === 204 ? null : response.json();
-
   const body = await response.text();
   const error = new Error(body || `API request failed: ${response.status}`);
   error.status = response.status;
-
   const isAuthEndpoint = path.startsWith('/auth/');
   if (response.status === 401 && retry && !isAuthEndpoint) {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     if (refreshToken) {
       try {
-        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken })
-        });
+        const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken }) });
         if (refreshResponse.ok) {
           const refreshed = await refreshResponse.json();
           localStorage.setItem(ACCESS_TOKEN_KEY, refreshed.accessToken);
           localStorage.setItem(REFRESH_TOKEN_KEY, refreshed.refreshToken);
           return request(path, options, false);
         }
-      } catch { /* fall through to login redirect */ }
+      } catch { }
     }
     clearSession();
     redirectToLogin();
   }
-
   throw error;
 }
 
 async function requestTest(path, options = {}) {
-  try {
-    return await request(path, options);
-  } catch (error) {
+  try { return await request(path, options); }
+  catch (error) {
     if (error.status === 403) {
       try {
         const payload = JSON.parse(error.message);
@@ -60,7 +51,7 @@ async function requestTest(path, options = {}) {
           window.location.href = `/premium.html?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`;
           return new Promise(() => {});
         }
-      } catch { /* keep original error */ }
+      } catch { }
     }
     throw error;
   }
@@ -74,6 +65,7 @@ export const api = {
   questions: id => requestTest(`/tests/${id}/questions`),
   submit: (id, answers, timeTakenSeconds) => requestTest(`/tests/${id}/submit`, { method: 'POST', body: JSON.stringify({ answers, timeTakenSeconds }) }),
   attempts: {
+    active: () => request('/tests/attempts/active'),
     start: id => requestTest(`/tests/${id}/start`, { method: 'POST' }),
     get: id => request(`/tests/attempts/${id}`),
     saveAnswer: (id, body) => request(`/tests/attempts/${id}/answers`, { method: 'PUT', body: JSON.stringify(body) }),
@@ -99,7 +91,7 @@ export const api = {
     me: () => request('/subscriptions/me'),
     history: () => request('/subscriptions/history'),
     payments: () => request('/subscriptions/payments'),
-    createOrder: planId => request('/subscriptions/create-order', { method: 'POST', body: JSON.stringify({ planId }) }),
+    createOrder: planId => request('/subscriptions/create-order', { method: 'POST', body: JSON.stringify({ planId })),
     verify: body => request('/subscriptions/verify', { method: 'POST', body: JSON.stringify(body) })
   },
   admin: {
