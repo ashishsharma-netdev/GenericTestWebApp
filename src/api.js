@@ -20,6 +20,7 @@ export const api = {
   auth: {
     register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
     login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+    google: idToken => request('/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) }),
     refresh: body => request('/auth/refresh', { method: 'POST', body: JSON.stringify(body) }),
     logout: body => request('/auth/logout', { method: 'POST', body: JSON.stringify(body) }),
     me: () => request('/auth/me'),
