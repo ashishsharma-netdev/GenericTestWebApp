@@ -33,7 +33,7 @@ async function refreshSession() {
 async function authenticatedCall(fn) {
   try { return await fn(); }
   catch (error) {
-    if (error.message?.includes('401') && await refreshSession()) return fn();
+    if (error.status === 401 && await refreshSession()) return fn();
     throw error;
   }
 }
@@ -97,14 +97,14 @@ function App() {
         <div className="welcome-mini"><span className="user-avatar large">{initials(user?.fullName)}</span><div><b>{user?.fullName || 'Student'}</b><small>{isPremium(user) ? 'Premium User' : 'Free User'}</small></div></div>
         <div className="student-nav">{navItems.map(([id, label, Icon]) => <button key={id} className={page === id ? 'active' : ''} onClick={() => setPage(id)}><Icon size={18}/><span>{label}</span>{id === 'history' && history.length > 0 && <em>{history.length}</em>}</button>)}</div>
         <div className="sidebar-upgrade">
-          {isPremium(user) ? <><Crown size={19}/><b>Premium Active</b><small>Keep improving your score.</small></> : <><Crown size={19}/><b>Unlock Premium</b><small>More tests, analytics and study tools.</small><button onClick={() => alert('Premium plans will be connected in the subscription phase.')}>View Plans</button></>}
+          {isPremium(user) ? <><Crown size={19}/><b>Premium Active</b><small>Keep improving your score.</small></> : <><Crown size={19}/><b>Unlock Premium</b><small>More tests, analytics and study tools.</small><button onClick={() => window.location.href = '/premium.html'}>View Plans</button></>}
         </div>
         <button className="signout" onClick={signOut}><LogOut size={17}/> Sign Out</button>
       </aside>
       <main className="student-content">
         {error && <div className="student-alert"><XCircle size={16}/>{error}<button onClick={loadData}>Retry</button></div>}
         {page === 'dashboard' && <Dashboard user={user} history={history} tests={tests} categories={categories} onPage={setPage}/>} 
-        {page === 'tests' && <MyTests tests={tests} history={history} onRefresh={loadData}/>} 
+        {page === 'tests' && <MyTests tests={tests} history={history} premium={isPremium(user)} onRefresh={loadData}/>} 
         {page === 'history' && <History history={history}/>} 
         {page === 'profile' && <Profile user={user} onSaved={updateUser}/>} 
       </main>
@@ -135,14 +135,21 @@ function Dashboard({ user, history, tests, categories, onPage }) {
   </>;
 }
 
-function MyTests({ tests, history, onRefresh }) {
+function MyTests({ tests, history, premium, onRefresh }) {
   const attemptedIds = useMemo(() => new Set(history.map(x => x.testId)), [history]);
   const [filter, setFilter] = useState('all');
   const filtered = filter === 'attempted' ? tests.filter(t => attemptedIds.has(t.id)) : filter === 'new' ? tests.filter(t => !attemptedIds.has(t.id)) : tests;
   return <>
     <div className="student-heading"><div><p className="eyebrow">MY TESTS</p><h1>Practice Library</h1><p>Browse available mock tests and continue your preparation.</p></div><button className="ghost-button" onClick={onRefresh}><RefreshCw size={15}/> Refresh</button></div>
     <div className="filter-tabs"><button className={filter === 'all' ? 'active' : ''} onClick={() => setFilter('all')}>All Tests</button><button className={filter === 'new' ? 'active' : ''} onClick={() => setFilter('new')}>Not Attempted</button><button className={filter === 'attempted' ? 'active' : ''} onClick={() => setFilter('attempted')}>Attempted</button></div>
-    {filtered.length ? <div className="test-library">{filtered.map(t => <div className="library-card" key={`${t.id}-${t.title}`}><div className="library-icon">◈</div><div className="library-body"><span className="test-category">{t.category || 'Exam'}</span><h3>{t.title}</h3><p>{t.questions} Questions · {t.marks} Marks · {t.durationMinutes} Minutes</p><div className="library-meta">{attemptedIds.has(t.id) ? <span className="attempted"><CheckCircle2 size={14}/> Attempted</span> : <span><Clock3 size={14}/> New Test</span>}{t.tag && <span className="tag">{t.tag}</span>}</div></div><a className="test-launch" href={`/?testId=${t.id}`}>Start <ArrowRight size={15}/></a></div>)}</div> : <div className="empty-card"><ClipboardList size={34}/><h3>No tests found</h3><p>Try another filter or refresh the test library.</p></div>}
+    {filtered.length ? <div className="test-library">{filtered.map(t => {
+      const locked = !!t.isLocked && !premium;
+      return <div className={`library-card${locked ? ' locked-test' : ''}`} key={`${t.id}-${t.title}`}>
+        <div className="library-icon">{locked ? <LockKeyhole size={18}/> : '◈'}</div>
+        <div className="library-body"><span className="test-category">{t.category || 'Exam'}</span><h3>{t.title}</h3><p>{t.questions} Questions · {t.marks} Marks · {t.durationMinutes} Minutes</p><div className="library-meta">{locked ? <span className="premium-required"><LockKeyhole size={14}/> Premium Required</span> : attemptedIds.has(t.id) ? <span className="attempted"><CheckCircle2 size={14}/> Attempted</span> : <span><Clock3 size={14}/> New Test</span>}{t.tag && <span className="tag">{t.tag}</span>}</div></div>
+        {locked ? <a className="test-launch premium-launch" href="/premium.html">Unlock <Crown size={14}/></a> : <a className="test-launch" href={`/?testId=${t.id}`}>Start <ArrowRight size={15}/></a>}
+      </div>;
+    })}</div> : <div className="empty-card"><ClipboardList size={34}/><h3>No tests found</h3><p>Try another filter or refresh the test library.</p></div>}
   </>;
 }
 
