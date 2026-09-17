@@ -1,3 +1,19 @@
-import React,{useState} from 'react';import {createRoot} from 'react-dom/client';import {api} from './api';import './auth.css';
-function App(){const[mode,setMode]=useState('login'),[name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);const submit=async e=>{e.preventDefault();setBusy(true);setError('');try{const r=mode==='login'?await api.auth.login({email,password}):await api.auth.register({fullName:name,email,password});localStorage.setItem('testprep_access_token',r.accessToken);localStorage.setItem('testprep_refresh_token',r.refreshToken);window.location.href='/'}catch(e){setError(e.message)}finally{setBusy(false)}};return <div className="auth-page"><div className="auth-card"><div className="auth-logo">✦</div><h1>{mode==='login'?'Welcome Back':'Create Account'}</h1><p>{mode==='login'?'Sign in to continue your preparation.':'Start your exam preparation journey.'}</p>{error&&<div className="auth-error">{error}</div>}<form onSubmit={submit}>{mode==='register'&&<label>Full Name<input required value={name} onChange={e=>setName(e.target.value)}/></label>}<label>Email<input required type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input required minLength="6" type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="auth-primary" disabled={busy}>{busy?'Please wait...':mode==='login'?'Sign In':'Create Account'}</button></form><button className="switch" onClick={()=>{setMode(mode==='login'?'register':'login');setError('')}}>{mode==='login'?"Don't have an account? Create one":"Already have an account? Sign in"}</button><a href="/">Continue without signing in</a></div></div>}
+import React,{useState} from 'react';
+import {createRoot} from 'react-dom/client';
+import {api} from './api';
+import './auth.css';
+
+function App(){
+  const[mode,setMode]=useState('login'),[name,setName]=useState(''),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+  const submit=async e=>{
+    e.preventDefault();setBusy(true);setError('');
+    try{
+      const r=mode==='login'?await api.auth.login({email,password}):await api.auth.register({fullName:name,email,password});
+      localStorage.setItem('testprep_access_token',r.accessToken);
+      localStorage.setItem('testprep_refresh_token',r.refreshToken);
+      window.location.href='/student.html';
+    }catch(e){setError(e.message)}finally{setBusy(false)}
+  };
+  return <div className="auth-page"><div className="auth-card"><div className="auth-logo">✦</div><h1>{mode==='login'?'Welcome Back':'Create Account'}</h1><p>{mode==='login'?'Sign in to continue your preparation.':'Start your exam preparation journey.'}</p>{error&&<div className="auth-error">{error}</div>}<form onSubmit={submit}>{mode==='register'&&<label>Full Name<input required value={name} onChange={e=>setName(e.target.value)}/></label>}<label>Email<input required type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input required minLength="6" type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="auth-primary" disabled={busy}>{busy?'Please wait...':mode==='login'?'Sign In':'Create Account'}</button></form><button className="switch" onClick={()=>{setMode(mode==='login'?'register':'login');setError('')}}>{mode==='login'?"Don't have an account? Create one":"Already have an account? Sign in"}</button><a href="/">Continue without signing in</a></div></div>
+}
 createRoot(document.getElementById('auth-root')).render(<App/>);
