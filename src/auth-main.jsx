@@ -26,7 +26,8 @@ function friendlyError(error, fallback) {
 }
 
 function App() {
-  const [mode, setMode] = useState('login');
+  const queryMode = new URLSearchParams(window.location.search).get('mode');
+  const [mode, setMode] = useState(queryMode === 'register' ? 'register' : 'login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -92,7 +93,15 @@ function App() {
     } finally { setBusy(false); }
   };
 
-  const switchMode = () => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setConfirmPassword(''); };
+  const switchMode = () => {
+    const next = mode === 'login' ? 'register' : 'login';
+    setMode(next);
+    setError('');
+    setConfirmPassword('');
+    const params = new URLSearchParams(window.location.search);
+    params.set('mode', next);
+    window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+  };
 
   return <div className="auth-page">
     <div className="auth-card">
