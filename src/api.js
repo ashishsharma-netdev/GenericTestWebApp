@@ -78,7 +78,10 @@ export const api = {
     plans: () => request('/admin/subscriptions/plans'),
     updatePlan: (id, body) => request(`/admin/subscriptions/plans/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
     manualActivate: body => request('/admin/subscriptions/manual-activate', { method: 'POST', body: JSON.stringify(body) }),
-    cancelSubscription: id => request(`/admin/subscriptions/${id}/cancel`, { method: 'POST' })
+    cancelSubscription: id => request(`/admin/subscriptions/${id}/cancel`, { method: 'POST' }),
+    users: (search = '', status = 'All') => request(`/admin/users?search=${encodeURIComponent(search)}&status=${encodeURIComponent(status)}`),
+    user: id => request(`/admin/users/${id}`),
+    setUserStatus: (id, isActive) => request(`/admin/users/${id}/status`, { method: 'PUT', body: JSON.stringify({ isActive }) })
   }
 };
 
