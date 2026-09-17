@@ -6,17 +6,39 @@ async function request(path, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     ...options
   });
-  if (!response.ok) throw new Error((await response.text()) || `API request failed: ${response.status}`);
+  if (!response.ok) {
+    const body = await response.text();
+    const error = new Error(body || `API request failed: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   return response.status === 204 ? null : response.json();
+}
+
+async function requestTest(path, options = {}) {
+  try {
+    return await request(path, options);
+  } catch (error) {
+    if (error.status === 403) {
+      try {
+        const payload = JSON.parse(error.message);
+        if (payload.requiresPremium) {
+          window.location.href = '/premium.html';
+          return new Promise(() => {});
+        }
+      } catch { /* keep normal API error */ }
+    }
+    throw error;
+  }
 }
 
 export const api = {
   health: () => request('/health'),
   categories: () => request('/exams/categories'),
   tests: c => request(`/exams/${encodeURIComponent(c)}/tests`),
-  test: id => request(`/tests/${id}`),
-  questions: id => request(`/tests/${id}/questions`),
-  submit: (id, answers, timeTakenSeconds) => request(`/tests/${id}/submit`, { method: 'POST', body: JSON.stringify({ answers, timeTakenSeconds }) }),
+  test: id => requestTest(`/tests/${id}`),
+  questions: id => requestTest(`/tests/${id}/questions`),
+  submit: (id, answers, timeTakenSeconds) => requestTest(`/tests/${id}/submit`, { method: 'POST', body: JSON.stringify({ answers, timeTakenSeconds }) }),
   auth: {
     register: body => request('/auth/register', { method: 'POST', body: JSON.stringify(body) }),
     login: body => request('/auth/login', { method: 'POST', body: JSON.stringify(body) }),
