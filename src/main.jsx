@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { createRoot } from 'react-dom/client';
 import { BookOpen, LayoutDashboard, ClipboardList, Grid2X2, BarChart3, Bookmark, Newspaper, FileText, Mic, Search, Bell, ChevronRight, PlayCircle, XCircle, Flag, ArrowLeft, ShieldCheck, Clock3, RefreshCw, AlertCircle, Trophy, Target, Sparkles } from 'lucide-react';
 import './styles.css';
 import { api } from './api';
@@ -12,7 +11,10 @@ const fallbackExams = [
 ];
 
 function App() {
-  const [page, setPage] = useState('home'); const [exam, setExam] = useState('SSC'); const [categories, setCategories] = useState(fallbackExams); const [tests, setTests] = useState([]);
+  const query = new URLSearchParams(window.location.search);
+  const requestedTestId = Number(query.get('testId')) || 0;
+  const requestedExam = query.get('exam');
+  const [page, setPage] = useState(requestedTestId > 0 ? 'instructions' : 'home'); const [exam, setExam] = useState(requestedExam || 'SSC'); const [categories, setCategories] = useState(fallbackExams); const [tests, setTests] = useState([]);
   const [selectedTest, setSelectedTest] = useState(null); const [questions, setQuestions] = useState([]); const [answers, setAnswers] = useState({}); const [marked, setMarked] = useState({});
   const [currentIndex, setCurrentIndex] = useState(0); const [secondsLeft, setSecondsLeft] = useState(0); const [testStartedAt, setTestStartedAt] = useState(null); const [attemptId, setAttemptId] = useState(null);
   const [submitted, setSubmitted] = useState(false); const [result, setResult] = useState(null); const [loading, setLoading] = useState(false); const [apiError, setApiError] = useState('');
@@ -31,6 +33,11 @@ function App() {
     catch (e) { setApiError(e.message || 'Unable to load this test.'); }
     finally { setLoading(false); }
   };
+
+  useEffect(() => {
+    if (!requestedTestId) return;
+    startInstructions({ id: requestedTestId, title: 'Loading test...', questions: 0, marks: 0, durationMinutes: 0, negativeMarking: 0 });
+  }, []);
 
   const startTest = async () => {
     if (!selectedTest || !questions.length) { setApiError('This test is not ready because no questions were returned by the API.'); return; }
@@ -67,7 +74,7 @@ function App() {
 
   return <div className="app"><Header nav={nav} page={page}/>{apiError && <div className="api-banner"><AlertCircle size={14}/>{apiError}<button onClick={() => setApiError('')}>×</button></div>}
     {page === 'home' && <Home exams={categories} onStart={() => chooseExam('SSC')}/>} {page !== 'home' && <div className="shell"><Sidebar page={page} nav={nav}/><main className="content">
-      {page === 'dashboard' && <Dashboard/>}{page === 'categories' && <Categories exams={categories} onSelect={chooseExam}/>} {page === 'tests' && <Tests exam={exam} tests={tests} loading={loading} onStart={startInstructions}/>} 
+      {page === 'dashboard' && <Dashboard/>}{page === 'categories' && <Categories exams={categories} onSelect={chooseExam}/>} {page === 'tests' && <Tests exam={exam} tests={tests} loading={loading} onStart={startInstructions}/>}
       {page === 'instructions' && <Instructions test={selectedTest} loading={loading} onBack={() => nav('tests')} onStart={startTest}/>} 
       {page === 'test' && <TestScreen questions={questions} currentIndex={currentIndex} setCurrentIndex={setCurrentIndex} answers={answers} setAnswers={setAnswers} marked={marked} setMarked={setMarked} secondsLeft={secondsLeft} setAnswer={setAnswerForQuestion} toggleMark={toggleMarkForQuestion} clearAnswer={clearAnswerForQuestion} onSubmit={() => setSubmitted(true)}/>} 
       {page === 'performance' && <Analysis result={result}/>} {page === 'result' && <Result result={result} onAnalysis={() => nav('performance')} onAgain={() => nav('tests')}/>} 
